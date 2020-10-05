@@ -22,6 +22,17 @@ where
             _phantom: std::marker::PhantomData,
         }
     }
+    pub fn inverted(min: N, max: N) -> LogarithmicScale<N, F> {
+        LogarithmicScale {
+            min: min.clone(),
+            max: max.clone(),
+            linear_delegate: LinearScale::inverted(
+                apply_to(min, f64::log10),
+                apply_to(max, f64::log10),
+            ),
+            _phantom: std::marker::PhantomData,
+        }
+    }
 
     pub fn with_rasterizer(
         min: N,
@@ -32,6 +43,23 @@ where
             min: min.clone(),
             max: max.clone(),
             linear_delegate: LinearScale::with_rasterizer(
+                apply_to(min, f64::log10),
+                apply_to(max, f64::log10),
+                rasterizer,
+            ),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn inverted_with_rasterizer(
+        min: N,
+        max: N,
+        rasterizer: impl Fn(N) -> N + 'static,
+    ) -> LogarithmicScale<N, F> {
+        LogarithmicScale {
+            min: min.clone(),
+            max: max.clone(),
+            linear_delegate: LinearScale::inverted_with_rasterizer(
                 apply_to(min, f64::log10),
                 apply_to(max, f64::log10),
                 rasterizer,
@@ -108,6 +136,34 @@ mod tests {
     }
 
     #[test]
+    fn test_log_inverted() {
+        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::inverted(10.0, 10240.0);
+        assert_approx_eq!(scale.to_absolute(0.0), 10240.0);
+        assert_approx_eq!(scale.to_absolute(0.1), 5120.0);
+        assert_approx_eq!(scale.to_absolute(0.2), 2560.0);
+        assert_approx_eq!(scale.to_absolute(0.3), 1280.0);
+        assert_approx_eq!(scale.to_absolute(0.4), 640.0);
+        assert_approx_eq!(scale.to_absolute(0.5), 320.0);
+        assert_approx_eq!(scale.to_absolute(0.6), 160.0);
+        assert_approx_eq!(scale.to_absolute(0.7), 80.0);
+        assert_approx_eq!(scale.to_absolute(0.8), 40.0);
+        assert_approx_eq!(scale.to_absolute(0.9), 20.0);
+        assert_approx_eq!(scale.to_absolute(1.0), 10.0);
+
+        assert_approx_eq!(scale.to_relative(10.0), 1.0);
+        assert_approx_eq!(scale.to_relative(20.0), 0.9);
+        assert_approx_eq!(scale.to_relative(40.0), 0.8);
+        assert_approx_eq!(scale.to_relative(80.0), 0.7);
+        assert_approx_eq!(scale.to_relative(160.0), 0.6);
+        assert_approx_eq!(scale.to_relative(320.0), 0.5);
+        assert_approx_eq!(scale.to_relative(640.0), 0.4);
+        assert_approx_eq!(scale.to_relative(1280.0), 0.3);
+        assert_approx_eq!(scale.to_relative(2560.0), 0.2);
+        assert_approx_eq!(scale.to_relative(5120.0), 0.1);
+        assert_approx_eq!(scale.to_relative(10240.0), 0.0);
+    }
+
+    #[test]
     fn test_log_out_of_bounds() {
         let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(-0.1), 5.0);
@@ -132,19 +188,23 @@ mod tests {
     }
 
     // #[test]
-    fn _benchmark_ref() {
-        let step = 1.0 / 100_000_000.0;
+    fn _benchmark() {
+        let loops = 100_000_000;
+
+        let upper = loops as f64;
+        let step = 1.0 / upper;
+
+        // reference run
 
         let mut results = Vec::new();
-
-        let start = Instant::now();
-
         let min = 10f64.log10();
         let max = 1_000f64.log10();
+        let range = max - min;
 
-        for i in 0..100_000_000 {
+        let start = Instant::now();
+        for i in 0..loops {
             let relative = i as f64 * step;
-            results.push(10f64.powf(min + relative * (max - min)));
+            results.push(10f64.powf(min + relative * range));
         }
         let duration = start.elapsed();
 
@@ -152,19 +212,14 @@ mod tests {
 
         eprintln!("{}", duration.as_millis());
         eprintln!("{:?}", sample);
-    }
 
-    // #[test]
-    fn _benchmark() {
-        let step = 1.0 / 100_000_000.0;
+        // actual run
 
         let mut results = Vec::new();
-
         let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 1_000.0);
 
         let start = Instant::now();
-
-        for i in 0..100_000_000 {
+        for i in 0..loops {
             let relative = i as f64 * step;
             let result = scale.to_absolute(relative);
             results.push(result);

@@ -7,6 +7,7 @@ pub struct LinearScale<N, F> {
     min_f64: f64,
     full_range: f64,
     rasterizer: Option<Box<dyn Fn(N) -> N>>,
+    inverted: bool,
     _phantom: std::marker::PhantomData<F>,
 }
 
@@ -26,6 +27,23 @@ where
             min_f64,
             full_range,
             rasterizer: None,
+            inverted: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn inverted(min: N, max: N) -> LinearScale<N, F> {
+        let min_f64 = to_f64(min.clone());
+        let max_f64 = to_f64(max.clone());
+        let full_range = max_f64 - min_f64;
+
+        LinearScale {
+            min,
+            max,
+            min_f64,
+            full_range,
+            rasterizer: None,
+            inverted: true,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -45,6 +63,27 @@ where
             min_f64,
             full_range,
             rasterizer: Some(Box::new(rasterizer)),
+            inverted: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn inverted_with_rasterizer(
+        min: N,
+        max: N,
+        rasterizer: impl Fn(N) -> N + 'static,
+    ) -> LinearScale<N, F> {
+        let min_f64 = to_f64(min.clone());
+        let max_f64 = to_f64(max.clone());
+        let full_range = max_f64 - min_f64;
+
+        LinearScale {
+            min,
+            max,
+            min_f64,
+            full_range,
+            rasterizer: Some(Box::new(rasterizer)),
+            inverted: true,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -63,11 +102,20 @@ where
         };
         let absolute: f64 = to_f64(absolute);
         let partial_range = absolute - self.min_f64;
-        F::from_float(partial_range / self.full_range)
+
+        if self.inverted {
+            F::from_float(1.0 - (partial_range / self.full_range))
+        } else {
+            F::from_float(partial_range / self.full_range)
+        }
     }
 
     fn to_absolute(&self, relative: F) -> N {
-        let relative: f64 = relative.to_float();
+        let relative: f64 = if self.inverted {
+            1.0 - relative.to_float()
+        } else {
+            relative.to_float()
+        };
 
         let partial = relative * self.full_range;
         let abs = self.min_f64 + partial;
@@ -203,5 +251,22 @@ mod tests {
         assert_approx_eq!(scale.to_absolute(2.0), 200.0);
         assert_approx_eq!(scale.to_clamped_absolute(-1.0), 0.0);
         assert_approx_eq!(scale.to_clamped_absolute(2.0), 100.0);
+    }
+
+    #[test]
+    fn test_inverted() {
+        let scale: LinearScale<f64, f64> = LinearScale::inverted(0.0, 100.0);
+
+        assert_approx_eq!(scale.to_relative(0.0), 1.0);
+        assert_approx_eq!(scale.to_relative(100.0), 0.0);
+        assert_approx_eq!(scale.to_relative(10.0), 0.9);
+        assert_approx_eq!(scale.to_relative(50.0), 0.5);
+        assert_approx_eq!(scale.to_relative(90.0), 0.1);
+
+        assert_approx_eq!(scale.to_absolute(0.0), 100.0);
+        assert_approx_eq!(scale.to_absolute(1.0), 0.0);
+        assert_approx_eq!(scale.to_absolute(0.1), 90.0);
+        assert_approx_eq!(scale.to_absolute(0.5), 50.0);
+        assert_approx_eq!(scale.to_absolute(0.9), 10.0);
     }
 }
