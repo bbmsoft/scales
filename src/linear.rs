@@ -129,6 +129,130 @@ where
     }
 }
 
+pub struct DynamicLinearScale<N, Min, Max, Raster>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    Min: Fn() -> N,
+    Max: Fn() -> N,
+    Raster: Fn(N) -> N,
+{
+    min: Min,
+    max: Max,
+    rasterizer: Option<Raster>,
+    inverted: bool,
+}
+
+impl<N, Min, Max, Raster> DynamicLinearScale<N, Min, Max, Raster>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    Min: Fn() -> N,
+    Max: Fn() -> N,
+    Raster: Fn(N) -> N,
+{
+    pub fn new(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max, Raster> {
+        DynamicLinearScale {
+            min,
+            max,
+            rasterizer: None,
+            inverted: false,
+        }
+    }
+
+    pub fn inverted(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max, Raster> {
+        DynamicLinearScale {
+            min,
+            max,
+            rasterizer: None,
+            inverted: true,
+        }
+    }
+
+    pub fn with_rasterizer(
+        min: Min,
+        max: Max,
+        rasterizer: Raster,
+    ) -> DynamicLinearScale<N, Min, Max, Raster> {
+        DynamicLinearScale {
+            min,
+            max,
+            rasterizer: Some(rasterizer),
+            inverted: false,
+        }
+    }
+    pub fn inverted_with_rasterizer(
+        min: Min,
+        max: Max,
+        rasterizer: Raster,
+    ) -> DynamicLinearScale<N, Min, Max, Raster> {
+        DynamicLinearScale {
+            min,
+            max,
+            rasterizer: Some(rasterizer),
+            inverted: true,
+        }
+    }
+}
+
+impl<N, Min, Max, Raster> Scale<N> for DynamicLinearScale<N, Min, Max, Raster>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    Min: Fn() -> N,
+    Max: Fn() -> N,
+    Raster: Fn(N) -> N,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        let absolute = if let Some(rasterizer) = self.rasterizer.as_ref() {
+            rasterizer(absolute)
+        } else {
+            absolute
+        }
+        .to_float();
+
+        let min = self.min().to_float();
+        let max = self.min().to_float();
+
+        let partial_range = absolute - min;
+        let full_range = max - min;
+
+        if self.inverted {
+            1.0 - (partial_range / full_range)
+        } else {
+            partial_range / full_range
+        }
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        let relative: f64 = if self.inverted {
+            1.0 - relative
+        } else {
+            relative
+        };
+
+        let min = self.min().to_float();
+        let max = self.min().to_float();
+
+        let full_range = max - min;
+        let partial = relative * full_range;
+        let abs = min + partial;
+        let abs: N = N::from_float(abs);
+        if let Some(rasterizer) = self.rasterizer.as_ref() {
+            rasterizer(abs)
+        } else {
+            abs
+        }
+    }
+
+    fn max(&self) -> N {
+        let min = &self.min;
+        min()
+    }
+
+    fn min(&self) -> N {
+        let max = &self.max;
+        max()
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -187,8 +311,11 @@ mod tests {
         let scale_a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
         let scale_b: LinearScale<f64> = LinearScale::new(-1.0, 1.0);
 
-        assert_approx_eq!(scale_a.convert(25.0, &scale_b), -0.5);
-        assert_approx_eq!(scale_b.convert(0.5, &scale_a), 75.0);
+        assert_approx_eq!(scale_a.convert_to(&scale_b, 25.0), -0.5);
+        assert_approx_eq!(scale_b.convert_to(&scale_a, 0.5), 75.0);
+
+        assert_approx_eq!((&scale_a, &scale_b).convert(25.0), -0.5);
+        assert_approx_eq!((&scale_b, &scale_a).convert(0.5), 75.0);
     }
 
     #[test]
@@ -212,8 +339,8 @@ mod tests {
         assert_approx_eq!(scale_b.to_relative(5.0), 0.75);
         assert_approx_eq!(scale_b.to_absolute(0.75), 5.0);
 
-        assert_approx_eq!(scale_a.convert(75, &scale_b), 5.0);
-        assert_eq!(scale_b.convert(-5.0, &scale_a), 25);
+        assert_approx_eq!(scale_a.convert_to(&scale_b, 75), 5.0);
+        assert_eq!(scale_b.convert_to(&scale_a, -5.0), 25);
     }
 
     #[test]
