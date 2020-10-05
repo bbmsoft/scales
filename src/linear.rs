@@ -79,11 +79,11 @@ where
         }
     }
 
-    fn get_max(&self) -> N {
+    fn max(&self) -> N {
         self.max.clone()
     }
 
-    fn get_min(&self) -> N {
+    fn min(&self) -> N {
         self.min.clone()
     }
 }

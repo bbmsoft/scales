@@ -12,14 +12,14 @@ where
 {
     fn to_relative(&self, absolute: N) -> F;
     fn to_absolute(&self, relative: F) -> N;
-    fn get_max(&self) -> N;
-    fn get_min(&self) -> N;
+    fn max(&self) -> N;
+    fn min(&self) -> N;
 
     fn to_clamped_relative(&self, absolute: N) -> F {
-        let absolute = if absolute > self.get_max() {
-            self.get_max()
-        } else if absolute < self.get_min() {
-            self.get_min()
+        let absolute = if absolute > self.max() {
+            self.max()
+        } else if absolute < self.min() {
+            self.min()
         } else {
             absolute
         };
