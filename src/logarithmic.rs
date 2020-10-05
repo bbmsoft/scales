@@ -2,27 +2,24 @@ use super::convert::*;
 use super::linear::*;
 use super::*;
 
-pub struct LogarithmicScale<N, F> {
+pub struct LogarithmicScale<N> {
     min: N,
     max: N,
-    linear_delegate: LinearScale<N, F>,
-    _phantom: std::marker::PhantomData<F>,
+    linear_delegate: LinearScale<N>,
 }
 
-impl<N, F> LogarithmicScale<N, F>
+impl<N> LogarithmicScale<N>
 where
-    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
-    F: FromFloat<f64> + ToFloat<f64> + Clone,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    pub fn new(min: N, max: N) -> LogarithmicScale<N, F> {
+    pub fn new(min: N, max: N) -> LogarithmicScale<N> {
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
             linear_delegate: LinearScale::new(apply_to(min, f64::log10), apply_to(max, f64::log10)),
-            _phantom: std::marker::PhantomData,
         }
     }
-    pub fn inverted(min: N, max: N) -> LogarithmicScale<N, F> {
+    pub fn inverted(min: N, max: N) -> LogarithmicScale<N> {
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
@@ -30,7 +27,6 @@ where
                 apply_to(min, f64::log10),
                 apply_to(max, f64::log10),
             ),
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -38,7 +34,7 @@ where
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LogarithmicScale<N, F> {
+    ) -> LogarithmicScale<N> {
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
@@ -47,7 +43,6 @@ where
                 apply_to(max, f64::log10),
                 rasterizer,
             ),
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -55,7 +50,7 @@ where
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LogarithmicScale<N, F> {
+    ) -> LogarithmicScale<N> {
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
@@ -64,22 +59,20 @@ where
                 apply_to(max, f64::log10),
                 rasterizer,
             ),
-            _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<N, F> Scale<N, F> for LogarithmicScale<N, F>
+impl<N> Scale<N> for LogarithmicScale<N>
 where
-    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
-    F: FromFloat<f64> + ToFloat<f64> + Clone,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    fn to_relative(&self, absolute: N) -> F {
+    fn to_relative(&self, absolute: N) -> f64 {
         let abs_log = apply_to(absolute, f64::log10);
         self.linear_delegate.to_relative(abs_log)
     }
 
-    fn to_absolute(&self, relative: F) -> N {
+    fn to_absolute(&self, relative: f64) -> N {
         let abs_log = self.linear_delegate.to_absolute(relative);
         apply_to(abs_log, |f| 10f64.powf(f))
     }
@@ -93,12 +86,11 @@ where
     }
 }
 
-fn apply_to<N, F>(n: N, fun: impl Fn(f64) -> f64) -> N
+fn apply_to<N>(n: N, fun: impl Fn(f64) -> f64) -> N
 where
-    N: ToFloat<F> + FromFloat<F>,
-    F: ToFloat<f64> + FromFloat<f64>,
+    N: ToFloat<f64> + FromFloat<f64>,
 {
-    N::from_float(F::from_float(fun(n.to_float().to_float())))
+    N::from_float(fun(n.to_float()))
 }
 
 #[cfg(test)]
@@ -109,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_log() {
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 10240.0);
+        let scale: LogarithmicScale<f64> = LogarithmicScale::new(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(0.0), 10.0);
         assert_approx_eq!(scale.to_absolute(0.1), 20.0);
         assert_approx_eq!(scale.to_absolute(0.2), 40.0);
@@ -137,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_log_inverted() {
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::inverted(10.0, 10240.0);
+        let scale: LogarithmicScale<f64> = LogarithmicScale::inverted(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(0.0), 10240.0);
         assert_approx_eq!(scale.to_absolute(0.1), 5120.0);
         assert_approx_eq!(scale.to_absolute(0.2), 2560.0);
@@ -165,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_log_out_of_bounds() {
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 10240.0);
+        let scale: LogarithmicScale<f64> = LogarithmicScale::new(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(-0.1), 5.0);
         assert_approx_eq!(scale.to_absolute(-1.0), 0.0097656);
         assert_approx_eq!(scale.to_absolute(-2.0), 0.0000095);
@@ -216,7 +208,7 @@ mod tests {
         // actual run
 
         let mut results = Vec::new();
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 1_000.0);
+        let scale: LogarithmicScale<f64> = LogarithmicScale::new(10.0, 1_000.0);
 
         let start = Instant::now();
         for i in 0..loops {

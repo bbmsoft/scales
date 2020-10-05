@@ -1,24 +1,22 @@
 use super::convert::*;
 use super::*;
 
-pub struct LinearScale<N, F> {
+pub struct LinearScale<N> {
     min: N,
     max: N,
     min_f64: f64,
     full_range: f64,
     rasterizer: Option<Box<dyn Fn(N) -> N>>,
     inverted: bool,
-    _phantom: std::marker::PhantomData<F>,
 }
 
-impl<N, F> LinearScale<N, F>
+impl<N> LinearScale<N>
 where
-    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
-    F: FromFloat<f64> + ToFloat<f64> + Clone,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    pub fn new(min: N, max: N) -> LinearScale<N, F> {
-        let min_f64 = to_f64(min.clone());
-        let max_f64 = to_f64(max.clone());
+    pub fn new(min: N, max: N) -> LinearScale<N> {
+        let min_f64 = min.clone().to_float();
+        let max_f64 = max.clone().to_float();
         let full_range = max_f64 - min_f64;
 
         LinearScale {
@@ -28,13 +26,12 @@ where
             full_range,
             rasterizer: None,
             inverted: false,
-            _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn inverted(min: N, max: N) -> LinearScale<N, F> {
-        let min_f64 = to_f64(min.clone());
-        let max_f64 = to_f64(max.clone());
+    pub fn inverted(min: N, max: N) -> LinearScale<N> {
+        let min_f64 = min.clone().to_float();
+        let max_f64 = max.clone().to_float();
         let full_range = max_f64 - min_f64;
 
         LinearScale {
@@ -44,7 +41,6 @@ where
             full_range,
             rasterizer: None,
             inverted: true,
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -52,9 +48,9 @@ where
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LinearScale<N, F> {
-        let min_f64 = to_f64(min.clone());
-        let max_f64 = to_f64(max.clone());
+    ) -> LinearScale<N> {
+        let min_f64 = min.clone().to_float();
+        let max_f64 = max.clone().to_float();
         let full_range = max_f64 - min_f64;
 
         LinearScale {
@@ -64,7 +60,6 @@ where
             full_range,
             rasterizer: Some(Box::new(rasterizer)),
             inverted: false,
-            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -72,9 +67,9 @@ where
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LinearScale<N, F> {
-        let min_f64 = to_f64(min.clone());
-        let max_f64 = to_f64(max.clone());
+    ) -> LinearScale<N> {
+        let min_f64 = min.clone().to_float();
+        let max_f64 = max.clone().to_float();
         let full_range = max_f64 - min_f64;
 
         LinearScale {
@@ -84,42 +79,40 @@ where
             full_range,
             rasterizer: Some(Box::new(rasterizer)),
             inverted: true,
-            _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<N, F> Scale<N, F> for LinearScale<N, F>
+impl<N> Scale<N> for LinearScale<N>
 where
-    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
-    F: FromFloat<f64> + ToFloat<f64> + Clone,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    fn to_relative(&self, absolute: N) -> F {
+    fn to_relative(&self, absolute: N) -> f64 {
         let absolute = if let Some(rasterizer) = self.rasterizer.as_ref() {
             rasterizer(absolute)
         } else {
             absolute
         };
-        let absolute: f64 = to_f64(absolute);
+        let absolute = absolute.to_float();
         let partial_range = absolute - self.min_f64;
 
         if self.inverted {
-            F::from_float(1.0 - (partial_range / self.full_range))
+            1.0 - (partial_range / self.full_range)
         } else {
-            F::from_float(partial_range / self.full_range)
+            partial_range / self.full_range
         }
     }
 
-    fn to_absolute(&self, relative: F) -> N {
+    fn to_absolute(&self, relative: f64) -> N {
         let relative: f64 = if self.inverted {
-            1.0 - relative.to_float()
+            1.0 - relative
         } else {
-            relative.to_float()
+            relative
         };
 
         let partial = relative * self.full_range;
         let abs = self.min_f64 + partial;
-        let abs: N = from_f64(abs);
+        let abs: N = N::from_float(abs);
         if let Some(rasterizer) = self.rasterizer.as_ref() {
             rasterizer(abs)
         } else {
@@ -136,22 +129,6 @@ where
     }
 }
 
-fn to_f64<N, F>(n: N) -> f64
-where
-    N: ToFloat<F>,
-    F: ToFloat<f64>,
-{
-    n.to_float().to_float()
-}
-
-fn from_f64<N, F>(f: f64) -> N
-where
-    N: FromFloat<F>,
-    F: FromFloat<f64>,
-{
-    N::from_float(F::from_float(f))
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -161,7 +138,7 @@ mod tests {
     fn test_linear_to_rel_f64() {
         let min: f64 = 0.0;
         let max: f64 = 100.0;
-        let scale: LinearScale<f64, f64> = LinearScale::new(min, max);
+        let scale: LinearScale<f64> = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_relative(0.0), 0.0);
         assert_approx_eq!(scale.to_relative(100.0), 1.0);
         assert_approx_eq!(scale.to_relative(10.0), 0.1);
@@ -185,7 +162,7 @@ mod tests {
     fn test_linear_to_rel_f32() {
         let min: f32 = 0.0;
         let max: f32 = 100.0;
-        let scale: LinearScale<f32, f32> = LinearScale::new(min, max);
+        let scale: LinearScale<f32> = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_relative(0.0), 0.0);
         assert_approx_eq!(scale.to_relative(100.0), 1.0);
         assert_approx_eq!(scale.to_relative(10.0), 0.1);
@@ -207,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_linear_scale() {
-        let scale_a: LinearScale<f64, f64> = LinearScale::new(0.0, 100.0);
-        let scale_b: LinearScale<f64, f64> = LinearScale::new(-1.0, 1.0);
+        let scale_a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let scale_b: LinearScale<f64> = LinearScale::new(-1.0, 1.0);
 
         assert_approx_eq!(scale_a.convert(25.0, &scale_b), -0.5);
         assert_approx_eq!(scale_b.convert(0.5, &scale_a), 75.0);
@@ -219,7 +196,7 @@ mod tests {
         let min: f32 = 0.0;
         let max: f32 = 1_000.0;
         let step = 10.0;
-        let scale: LinearScale<f32, f32> =
+        let scale: LinearScale<f32> =
             LinearScale::with_rasterizer(min, max, move |u| (u / step).round() * step);
         assert_approx_eq!(scale.to_absolute(0.085), 90.0);
         assert_approx_eq!(scale.to_relative(85.0), 0.09);
@@ -227,11 +204,11 @@ mod tests {
 
     #[test]
     fn test_integral_linear_scale() {
-        let scale_a: LinearScale<usize, f32> = LinearScale::new(0, 100);
+        let scale_a: LinearScale<usize> = LinearScale::new(0, 100);
         assert_approx_eq!(scale_a.to_relative(20), 0.2);
         assert_eq!(scale_a.to_absolute(0.9), 90);
 
-        let scale_b: LinearScale<f64, f32> = LinearScale::new(-10.0, 10.0);
+        let scale_b: LinearScale<f64> = LinearScale::new(-10.0, 10.0);
         assert_approx_eq!(scale_b.to_relative(5.0), 0.75);
         assert_approx_eq!(scale_b.to_absolute(0.75), 5.0);
 
@@ -241,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_out_of_range() {
-        let scale: LinearScale<f64, f64> = LinearScale::new(0.0, 100.0);
+        let scale: LinearScale<f64> = LinearScale::new(0.0, 100.0);
         assert_approx_eq!(scale.to_relative(-100.0), -1.0);
         assert_approx_eq!(scale.to_relative(200.0), 2.0);
         assert_approx_eq!(scale.to_clamped_relative(-100.0), 0.0);
@@ -255,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_inverted() {
-        let scale: LinearScale<f64, f64> = LinearScale::inverted(0.0, 100.0);
+        let scale: LinearScale<f64> = LinearScale::inverted(0.0, 100.0);
 
         assert_approx_eq!(scale.to_relative(0.0), 1.0);
         assert_approx_eq!(scale.to_relative(100.0), 0.0);
