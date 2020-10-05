@@ -311,9 +311,6 @@ mod tests {
         let scale_a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
         let scale_b: LinearScale<f64> = LinearScale::new(-1.0, 1.0);
 
-        assert_approx_eq!(scale_a.convert_to(&scale_b, 25.0), -0.5);
-        assert_approx_eq!(scale_b.convert_to(&scale_a, 0.5), 75.0);
-
         assert_approx_eq!((&scale_a, &scale_b).convert(25.0), -0.5);
         assert_approx_eq!((&scale_b, &scale_a).convert(0.5), 75.0);
     }
@@ -339,8 +336,8 @@ mod tests {
         assert_approx_eq!(scale_b.to_relative(5.0), 0.75);
         assert_approx_eq!(scale_b.to_absolute(0.75), 5.0);
 
-        assert_approx_eq!(scale_a.convert_to(&scale_b, 75), 5.0);
-        assert_eq!(scale_b.convert_to(&scale_a, -5.0), 25);
+        assert_approx_eq!((&scale_a, &scale_b).convert(75), 5.0);
+        assert_eq!((&scale_b, &scale_a).convert(-5.0), 25);
     }
 
     #[test]

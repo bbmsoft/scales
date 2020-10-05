@@ -50,14 +50,6 @@ where
         let abs_pos_out = self.to_absolute(relative_pos + relative_delta);
         abs_pos_out - absolute_pos
     }
-
-    fn convert_to<T>(&self, to_other: &impl Scale<T>, absolute: N) -> T
-    where
-        T: Sub<Output = T> + Add<Output = T> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    {
-        let rel = self.to_relative(absolute);
-        to_other.to_absolute(rel)
-    }
 }
 
 pub trait Converter<I, E>
@@ -78,7 +70,8 @@ where
     fn convert(&self, external_value: E) -> I {
         let external = self.0;
         let internal = self.1;
-        external.convert_to(internal, external_value)
+        let rel = external.to_relative(external_value);
+        internal.to_absolute(rel)
     }
 }
 
