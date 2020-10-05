@@ -15,7 +15,7 @@ where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
     F: FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    pub fn with_min_max(min: N, max: N) -> LinearScale<N, F> {
+    pub fn new(min: N, max: N) -> LinearScale<N, F> {
         let min_f64 = to_f64(min.clone());
         let max_f64 = to_f64(max.clone());
         let full_range = max_f64 - min_f64;
@@ -30,7 +30,7 @@ where
         }
     }
 
-    pub fn with_min_max_and_rasterizer(
+    pub fn with_rasterizer(
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
@@ -113,7 +113,7 @@ mod tests {
     fn test_linear_to_rel_f64() {
         let min: f64 = 0.0;
         let max: f64 = 100.0;
-        let scale: LinearScale<f64, f64> = LinearScale::with_min_max(min, max);
+        let scale: LinearScale<f64, f64> = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_relative(0.0), 0.0);
         assert_approx_eq!(scale.to_relative(100.0), 1.0);
         assert_approx_eq!(scale.to_relative(10.0), 0.1);
@@ -125,7 +125,7 @@ mod tests {
     fn test_linear_to_abs_f64() {
         let min: f64 = 0.0;
         let max: f64 = 100.0;
-        let scale = LinearScale::with_min_max(min, max);
+        let scale = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_absolute(0.0), 0.0);
         assert_approx_eq!(scale.to_absolute(1.0), 100.0);
         assert_approx_eq!(scale.to_absolute(0.1), 10.0);
@@ -137,7 +137,7 @@ mod tests {
     fn test_linear_to_rel_f32() {
         let min: f32 = 0.0;
         let max: f32 = 100.0;
-        let scale: LinearScale<f32, f32> = LinearScale::with_min_max(min, max);
+        let scale: LinearScale<f32, f32> = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_relative(0.0), 0.0);
         assert_approx_eq!(scale.to_relative(100.0), 1.0);
         assert_approx_eq!(scale.to_relative(10.0), 0.1);
@@ -149,7 +149,7 @@ mod tests {
     fn test_linear_to_abs_f32() {
         let min: f32 = 0.0;
         let max: f32 = 100.0;
-        let scale = LinearScale::with_min_max(min, max);
+        let scale = LinearScale::new(min, max);
         assert_approx_eq!(scale.to_absolute(0.0), 0.0);
         assert_approx_eq!(scale.to_absolute(1.0), 100.0);
         assert_approx_eq!(scale.to_absolute(0.1), 10.0);
@@ -159,8 +159,8 @@ mod tests {
 
     #[test]
     fn test_linear_scale() {
-        let scale_a: LinearScale<f64, f64> = LinearScale::with_min_max(0.0, 100.0);
-        let scale_b: LinearScale<f64, f64> = LinearScale::with_min_max(-1.0, 1.0);
+        let scale_a: LinearScale<f64, f64> = LinearScale::new(0.0, 100.0);
+        let scale_b: LinearScale<f64, f64> = LinearScale::new(-1.0, 1.0);
 
         assert_approx_eq!(scale_a.convert(25.0, &scale_b), -0.5);
         assert_approx_eq!(scale_b.convert(0.5, &scale_a), 75.0);
@@ -172,18 +172,18 @@ mod tests {
         let max: f32 = 1_000.0;
         let step = 10.0;
         let scale: LinearScale<f32, f32> =
-            LinearScale::with_min_max_and_rasterizer(min, max, move |u| (u / step).round() * step);
+            LinearScale::with_rasterizer(min, max, move |u| (u / step).round() * step);
         assert_approx_eq!(scale.to_absolute(0.085), 90.0);
         assert_approx_eq!(scale.to_relative(85.0), 0.09);
     }
 
     #[test]
     fn test_integral_linear_scale() {
-        let scale_a: LinearScale<usize, f32> = LinearScale::with_min_max(0, 100);
+        let scale_a: LinearScale<usize, f32> = LinearScale::new(0, 100);
         assert_approx_eq!(scale_a.to_relative(20), 0.2);
         assert_eq!(scale_a.to_absolute(0.9), 90);
 
-        let scale_b: LinearScale<f64, f32> = LinearScale::with_min_max(-10.0, 10.0);
+        let scale_b: LinearScale<f64, f32> = LinearScale::new(-10.0, 10.0);
         assert_approx_eq!(scale_b.to_relative(5.0), 0.75);
         assert_approx_eq!(scale_b.to_absolute(0.75), 5.0);
 
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_out_of_range() {
-        let scale: LinearScale<f64, f64> = LinearScale::with_min_max(0.0, 100.0);
+        let scale: LinearScale<f64, f64> = LinearScale::new(0.0, 100.0);
         assert_approx_eq!(scale.to_relative(-100.0), -1.0);
         assert_approx_eq!(scale.to_relative(200.0), 2.0);
         assert_approx_eq!(scale.to_clamped_relative(-100.0), 0.0);

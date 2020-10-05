@@ -14,19 +14,16 @@ where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<F> + ToFloat<F> + Clone,
     F: FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    pub fn with_min_max(min: N, max: N) -> LogarithmicScale<N, F> {
+    pub fn new(min: N, max: N) -> LogarithmicScale<N, F> {
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
-            linear_delegate: LinearScale::with_min_max(
-                apply_to(min, f64::log10),
-                apply_to(max, f64::log10),
-            ),
+            linear_delegate: LinearScale::new(apply_to(min, f64::log10), apply_to(max, f64::log10)),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn with_min_max_and_rasterizer(
+    pub fn with_rasterizer(
         min: N,
         max: N,
         rasterizer: impl Fn(N) -> N + 'static,
@@ -34,7 +31,7 @@ where
         LogarithmicScale {
             min: min.clone(),
             max: max.clone(),
-            linear_delegate: LinearScale::with_min_max_and_rasterizer(
+            linear_delegate: LinearScale::with_rasterizer(
                 apply_to(min, f64::log10),
                 apply_to(max, f64::log10),
                 rasterizer,
@@ -84,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_log() {
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::with_min_max(10.0, 10240.0);
+        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(0.0), 10.0);
         assert_approx_eq!(scale.to_absolute(0.1), 20.0);
         assert_approx_eq!(scale.to_absolute(0.2), 40.0);
@@ -112,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_log_out_of_bounds() {
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::with_min_max(10.0, 10240.0);
+        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 10240.0);
         assert_approx_eq!(scale.to_absolute(-0.1), 5.0);
         assert_approx_eq!(scale.to_absolute(-1.0), 0.0097656);
         assert_approx_eq!(scale.to_absolute(-2.0), 0.0000095);
@@ -163,7 +160,7 @@ mod tests {
 
         let mut results = Vec::new();
 
-        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::with_min_max(10.0, 1_000.0);
+        let scale: LogarithmicScale<f64, f64> = LogarithmicScale::new(10.0, 1_000.0);
 
         let start = Instant::now();
 
