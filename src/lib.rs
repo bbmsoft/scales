@@ -51,7 +51,7 @@ where
         abs_pos_out - absolute_pos
     }
 
-    fn convert<T>(&self, absolute: N, to_other: &impl Scale<T>) -> T
+    fn convert_to<T>(&self, to_other: &impl Scale<T>, absolute: N) -> T
     where
         T: Sub<Output = T> + Add<Output = T> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     {
@@ -65,27 +65,20 @@ where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
-    fn to_internal(&self, external_value: E) -> I;
-    fn to_external(&self, internal_value: I) -> E;
+    fn convert(&self, external_value: E) -> I;
 }
 
-impl<I, E, SI, SE> Converter<I, E> for (SE, SI)
+impl<I, E, SI, SE> Converter<I, E> for (&SE, &SI)
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     SI: Scale<I>,
     SE: Scale<E>,
 {
-    fn to_internal(&self, external_value: E) -> I {
-        let external = &self.0;
-        let internal = &self.1;
-        external.convert(external_value, internal)
-    }
-
-    fn to_external(&self, internal_value: I) -> E {
-        let external = &self.0;
-        let internal = &self.1;
-        internal.convert(internal_value, external)
+    fn convert(&self, external_value: E) -> I {
+        let external = self.0;
+        let internal = self.1;
+        external.convert_to(internal, external_value)
     }
 }
 
@@ -102,12 +95,52 @@ mod test {
 
     #[test]
     fn test_converter() {
-        let converter = (
-            LinearScale::new(0.0, 100.0),
-            LogarithmicScale::new(20.0, 24_000.0),
-        );
+        let lin = LinearScale::new(0.0, 100.0);
+        let log = LogarithmicScale::new(20.0, 24_000.0);
 
-        assert_approx_eq!(converter.to_internal(0.0), 20f64);
-        assert_approx_eq!(converter.to_internal(100.0), 24_000f64);
+        assert_approx_eq!((&lin, &log).convert(0.0), 20f64);
+        assert_approx_eq!((&lin, &log).convert(100.0), 24_000f64);
+    }
+
+    #[test]
+    fn example_from_readme() {
+        let slider = Slider;
+        let parameter = Parameter;
+
+        let relative = (slider.value() - slider.min()) / (slider.max() - slider.min());
+        let log_range = parameter.max().log10() - parameter.min().log10();
+        let exp = parameter.min().log10() + relative * log_range;
+        let new_value = 10f64.powf(exp);
+        parameter.set(new_value);
+
+        let slider_scale = LinearScale::new(slider.min(), slider.max());
+        let parameter_scale = LogarithmicScale::new(parameter.min(), parameter.max());
+
+        let new_value = (&slider_scale, &parameter_scale).convert(slider.value());
+        parameter.set(new_value);
+    }
+
+    struct Slider;
+    impl Slider {
+        fn value(&self) -> f64 {
+            21.0
+        }
+        fn min(&self) -> f64 {
+            0.0
+        }
+        fn max(&self) -> f64 {
+            100.0
+        }
+    }
+
+    struct Parameter;
+    impl Parameter {
+        fn set(&self, _: f64) {}
+        fn min(&self) -> f64 {
+            10.0
+        }
+        fn max(&self) -> f64 {
+            500.0
+        }
     }
 }
