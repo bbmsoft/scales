@@ -1,6 +1,6 @@
 # Scales
 
-[![Build Status](https://api.travis-ci.com/bbmsoft/scales.svg?branch=master)](https://travis-ci.com/github/bbmsoft/frost)
+[![Build Status](https://api.travis-ci.com/bbmsoft/scales.svg?branch=master)](https://travis-ci.com/github/bbmsoft/scales)
 [![Current Crates.io Version](https://img.shields.io/crates/v/scales.svg)](https://crates.io/crates/scales)
 
 A utility library for converting values between scales.
