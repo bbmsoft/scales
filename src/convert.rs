@@ -1,16 +1,24 @@
+/// Something that can be converted to a floating point number.
 pub trait ToFloat<F> {
+    /// Convert self into a floating point number.
     fn to_float(self) -> F;
 }
 
+/// Something that can be converted to an integral number.
 pub trait ToInt<I> {
+    /// Convert self into an integral number.
     fn to_int(self) -> I;
 }
 
+/// Something a floating point number can be converted into.
 pub trait FromFloat<F> {
+    /// Convert the provided floating point number into an instance of the implementing type.
     fn from_float(f: F) -> Self;
 }
 
+/// Something an integral number can be converted into.
 pub trait FromInt<I> {
+    /// Convert the provided integral number into an instance of the implementing type.
     fn from_int(i: I) -> Self;
 }
 

@@ -1,10 +1,17 @@
-pub mod convert;
-pub mod linear;
-pub mod logarithmic;
+pub mod prelude;
+
+mod convert;
+mod linear;
+mod logarithmic;
 
 use convert::*;
 use std::ops::*;
 
+/// A scale is a mapping of an arbitrary, not necessarily linear, continuous and monotonically
+/// increasing range of numbers to a relative value between 0.0 and 1.0.
+/// It's useful for converting corresponding values between different coordinate spaces, for example for
+/// processing input from or rendering to a graphical user interface. A typical example would
+/// be calculating the position of a slider knob that controls a logarithmically scaled parameter.
 pub trait Scale<N>
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,

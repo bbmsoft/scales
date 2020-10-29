@@ -1,6 +1,6 @@
 use super::convert::*;
 use super::*;
-
+/// A linear scale implementation with a fixed minimum and maximum that can optionally be inverted and/or rasterized.
 pub struct LinearScale<N> {
     min: N,
     max: N,
@@ -129,6 +129,7 @@ where
     }
 }
 
+/// A linear scale implementation where the minimum and maximum can change any time and need to be re-evaluated for every calculation.
 pub struct DynamicLinearScale<N, Min, Max, Raster>
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
