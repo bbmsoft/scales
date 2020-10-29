@@ -1,0 +1,24 @@
+[tasks.format]
+command = "cargo"
+args = ["fmt"]
+
+[tasks.build-dev]
+command = "cargo"
+args = ["build"]
+dependencies = ["format"]
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--release"]
+dependencies = ["format"]
+
+[tasks.doc]
+command = "cargo"
+args = ["doc"]
+dependencies = ["format"]
+
+[tasks.host-doc]
+command = "http"
+args = ["target/doc"]
+dependencies = ["doc"]
+watch = true
