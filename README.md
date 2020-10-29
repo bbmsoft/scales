@@ -30,3 +30,7 @@ where `slider_scale` and `parameter_scale` are reusable components that look lik
 let slider_scale = LinearScale::new(slider.min(), slider.max());
 let parameter_scale = LogarithmicScale::new(parameter.min(), parameter.max());
 ```
+
+## Early development status!
+
+Expect breaking changes anytime!
