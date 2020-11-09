@@ -65,9 +65,32 @@ where
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
     fn convert(&self, external_value: E) -> I;
+    fn convert_back(&self, internal_value: I) -> E;
 }
 
-impl<I, E, SI, SE> Converter<I, E> for (&SE, &SI)
+impl<N, SN> Scale<N> for &SN
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
+
+impl<I, E, SI, SE> Converter<I, E> for (SE, SI)
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
@@ -75,10 +98,17 @@ where
     SE: Scale<E>,
 {
     fn convert(&self, external_value: E) -> I {
-        let external = self.0;
-        let internal = self.1;
+        let external = &self.0;
+        let internal = &self.1;
         let rel = external.to_relative(external_value);
         internal.to_absolute(rel)
+    }
+
+    fn convert_back(&self, internal_value: I) -> E {
+        let external = &self.0;
+        let internal = &self.1;
+        let rel = internal.to_relative(internal_value);
+        external.to_absolute(rel)
     }
 }
 
@@ -99,7 +129,7 @@ mod test {
         let log = LogarithmicScale::new(20.0, 24_000.0);
 
         assert_approx_eq!((&lin, &log).convert(0.0), 20f64);
-        assert_approx_eq!((&lin, &log).convert(100.0), 24_000f64);
+        assert_approx_eq!((lin, log).convert(100.0), 24_000f64);
     }
 
     #[test]
