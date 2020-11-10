@@ -59,7 +59,7 @@ where
     }
 }
 
-pub trait Converter<I, E>
+pub trait Converter<E, I>
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
@@ -90,12 +90,12 @@ where
     }
 }
 
-impl<I, E, SI, SE> Converter<I, E> for (SE, SI)
+impl<E, I, SE, SI> Converter<E, I> for (SE, SI)
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    SI: Scale<I>,
     SE: Scale<E>,
+    SI: Scale<I>,
 {
     fn convert(&self, external_value: E) -> I {
         let external = &self.0;
