@@ -66,6 +66,18 @@ where
 {
     fn convert(&self, external_value: E) -> I;
     fn convert_back(&self, internal_value: I) -> E;
+
+    fn add_external(&self, external_delta: E, internal_value: I) -> I {
+        let external_value = self.convert_back(internal_value);
+        let new_internal_value = self.convert(external_value + external_delta);
+        new_internal_value
+    }
+
+    fn add_internal(&self, internal_delta: I, external_value: E) -> E {
+        let internal_value = self.convert(external_value);
+        let new_external_value = self.convert_back(internal_value + internal_delta);
+        new_external_value
+    }
 }
 
 impl<N, SN> Scale<N> for &SN
