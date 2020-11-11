@@ -5,6 +5,7 @@ mod linear;
 mod logarithmic;
 
 use convert::*;
+use std::cmp::Ordering;
 use std::ops::*;
 
 /// A scale is a mapping of an arbitrary, not necessarily linear, continuous and monotonically
@@ -80,6 +81,45 @@ where
     }
 }
 
+pub trait ClampingConverter<E, I>: Converter<E, I>
+where
+    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+{
+    fn external_max(&self) -> E;
+    fn external_min(&self) -> E;
+    fn internal_max(&self) -> I;
+    fn internal_min(&self) -> I;
+
+    fn add_external_clamped(&self, external_delta: E, internal_value: I) -> I {
+        let min = self.internal_min();
+        let max = self.internal_max();
+        let val = self.add_external(external_delta, internal_value);
+
+        match min.partial_cmp(&val) {
+            Some(Ordering::Greater) => min,
+            _ => match max.partial_cmp(&val) {
+                Some(Ordering::Less) => max,
+                _ => val,
+            },
+        }
+    }
+
+    fn add_internal_clamped(&self, internal_delta: I, external_value: E) -> E {
+        let min = self.external_min();
+        let max = self.external_max();
+        let val = self.add_internal(internal_delta, external_value);
+
+        match min.partial_cmp(&val) {
+            Some(Ordering::Greater) => min,
+            _ => match max.partial_cmp(&val) {
+                Some(Ordering::Less) => max,
+                _ => val,
+            },
+        }
+    }
+}
+
 impl<N, SN> Scale<N> for &SN
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
@@ -121,6 +161,30 @@ where
         let internal = &self.1;
         let rel = internal.to_relative(internal_value);
         external.to_absolute(rel)
+    }
+}
+
+impl<E, I, SE, SI> ClampingConverter<E, I> for (SE, SI)
+where
+    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SE: Scale<E>,
+    SI: Scale<I>,
+{
+    fn external_max(&self) -> E {
+        self.0.max()
+    }
+
+    fn external_min(&self) -> E {
+        self.0.min()
+    }
+
+    fn internal_max(&self) -> I {
+        self.1.max()
+    }
+
+    fn internal_min(&self) -> I {
+        self.1.min()
     }
 }
 
