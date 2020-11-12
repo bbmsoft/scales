@@ -1,5 +1,6 @@
 pub mod prelude;
 
+mod broken;
 mod convert;
 mod linear;
 mod logarithmic;
