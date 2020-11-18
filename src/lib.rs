@@ -1,10 +1,12 @@
 pub mod prelude;
 
+mod broken;
 mod convert;
 mod linear;
 mod logarithmic;
 
 use convert::*;
+use std::cmp::Ordering;
 use std::ops::*;
 
 /// A scale is a mapping of an arbitrary, not necessarily linear, continuous and monotonically
@@ -59,26 +61,131 @@ where
     }
 }
 
-pub trait Converter<I, E>
+pub trait Converter<E, I>
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
     fn convert(&self, external_value: E) -> I;
+    fn convert_back(&self, internal_value: I) -> E;
+
+    fn add_external(&self, external_delta: E, internal_value: I) -> I {
+        let external_value = self.convert_back(internal_value);
+        let new_internal_value = self.convert(external_value + external_delta);
+        new_internal_value
+    }
+
+    fn add_internal(&self, internal_delta: I, external_value: E) -> E {
+        let internal_value = self.convert(external_value);
+        let new_external_value = self.convert_back(internal_value + internal_delta);
+        new_external_value
+    }
 }
 
-impl<I, E, SI, SE> Converter<I, E> for (&SE, &SI)
+pub trait ClampingConverter<E, I>: Converter<E, I>
 where
     E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    SI: Scale<I>,
+{
+    fn external_max(&self) -> E;
+    fn external_min(&self) -> E;
+    fn internal_max(&self) -> I;
+    fn internal_min(&self) -> I;
+
+    fn add_external_clamped(&self, external_delta: E, internal_value: I) -> I {
+        let min = self.internal_min();
+        let max = self.internal_max();
+        let val = self.add_external(external_delta, internal_value);
+
+        match min.partial_cmp(&val) {
+            Some(Ordering::Greater) => min,
+            _ => match max.partial_cmp(&val) {
+                Some(Ordering::Less) => max,
+                _ => val,
+            },
+        }
+    }
+
+    fn add_internal_clamped(&self, internal_delta: I, external_value: E) -> E {
+        let min = self.external_min();
+        let max = self.external_max();
+        let val = self.add_internal(internal_delta, external_value);
+
+        match min.partial_cmp(&val) {
+            Some(Ordering::Greater) => min,
+            _ => match max.partial_cmp(&val) {
+                Some(Ordering::Less) => max,
+                _ => val,
+            },
+        }
+    }
+}
+
+impl<N, SN> Scale<N> for &SN
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
+
+impl<E, I, SE, SI> Converter<E, I> for (SE, SI)
+where
+    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     SE: Scale<E>,
+    SI: Scale<I>,
 {
     fn convert(&self, external_value: E) -> I {
-        let external = self.0;
-        let internal = self.1;
+        let external = &self.0;
+        let internal = &self.1;
         let rel = external.to_relative(external_value);
         internal.to_absolute(rel)
+    }
+
+    fn convert_back(&self, internal_value: I) -> E {
+        let external = &self.0;
+        let internal = &self.1;
+        let rel = internal.to_relative(internal_value);
+        external.to_absolute(rel)
+    }
+}
+
+impl<E, I, SE, SI> ClampingConverter<E, I> for (SE, SI)
+where
+    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SE: Scale<E>,
+    SI: Scale<I>,
+{
+    fn external_max(&self) -> E {
+        self.0.max()
+    }
+
+    fn external_min(&self) -> E {
+        self.0.min()
+    }
+
+    fn internal_max(&self) -> I {
+        self.1.max()
+    }
+
+    fn internal_min(&self) -> I {
+        self.1.min()
     }
 }
 
@@ -99,7 +206,7 @@ mod test {
         let log = LogarithmicScale::new(20.0, 24_000.0);
 
         assert_approx_eq!((&lin, &log).convert(0.0), 20f64);
-        assert_approx_eq!((&lin, &log).convert(100.0), 24_000f64);
+        assert_approx_eq!((lin, log).convert(100.0), 24_000f64);
     }
 
     #[test]

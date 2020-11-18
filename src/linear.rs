@@ -1,12 +1,12 @@
 use super::convert::*;
 use super::*;
-/// A linear scale implementation with a fixed minimum and maximum that can optionally be inverted and/or rasterized.
+/// A linear scale implementation with a fixed minimum and maximum that can optionally be inverted.
+#[derive(Debug, Clone)]
 pub struct LinearScale<N> {
     min: N,
     max: N,
     min_f64: f64,
     full_range: f64,
-    rasterizer: Option<Box<dyn Fn(N) -> N>>,
     inverted: bool,
 }
 
@@ -24,7 +24,6 @@ where
             max,
             min_f64,
             full_range,
-            rasterizer: None,
             inverted: false,
         }
     }
@@ -39,45 +38,6 @@ where
             max,
             min_f64,
             full_range,
-            rasterizer: None,
-            inverted: true,
-        }
-    }
-
-    pub fn with_rasterizer(
-        min: N,
-        max: N,
-        rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LinearScale<N> {
-        let min_f64 = min.clone().to_float();
-        let max_f64 = max.clone().to_float();
-        let full_range = max_f64 - min_f64;
-
-        LinearScale {
-            min,
-            max,
-            min_f64,
-            full_range,
-            rasterizer: Some(Box::new(rasterizer)),
-            inverted: false,
-        }
-    }
-
-    pub fn inverted_with_rasterizer(
-        min: N,
-        max: N,
-        rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LinearScale<N> {
-        let min_f64 = min.clone().to_float();
-        let max_f64 = max.clone().to_float();
-        let full_range = max_f64 - min_f64;
-
-        LinearScale {
-            min,
-            max,
-            min_f64,
-            full_range,
-            rasterizer: Some(Box::new(rasterizer)),
             inverted: true,
         }
     }
@@ -88,11 +48,6 @@ where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
 {
     fn to_relative(&self, absolute: N) -> f64 {
-        let absolute = if let Some(rasterizer) = self.rasterizer.as_ref() {
-            rasterizer(absolute)
-        } else {
-            absolute
-        };
         let absolute = absolute.to_float();
         let partial_range = absolute - self.min_f64;
 
@@ -112,12 +67,7 @@ where
 
         let partial = relative * self.full_range;
         let abs = self.min_f64 + partial;
-        let abs: N = N::from_float(abs);
-        if let Some(rasterizer) = self.rasterizer.as_ref() {
-            rasterizer(abs)
-        } else {
-            abs
-        }
+        N::from_float(abs)
     }
 
     fn max(&self) -> N {
@@ -130,84 +80,49 @@ where
 }
 
 /// A linear scale implementation where the minimum and maximum can change any time and need to be re-evaluated for every calculation.
-pub struct DynamicLinearScale<N, Min, Max, Raster>
+#[derive(Debug, Clone)]
+pub struct DynamicLinearScale<N, Min, Max>
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     Min: Fn() -> N,
     Max: Fn() -> N,
-    Raster: Fn(N) -> N,
 {
     min: Min,
     max: Max,
-    rasterizer: Option<Raster>,
     inverted: bool,
 }
 
-impl<N, Min, Max, Raster> DynamicLinearScale<N, Min, Max, Raster>
+impl<N, Min, Max> DynamicLinearScale<N, Min, Max>
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     Min: Fn() -> N,
     Max: Fn() -> N,
-    Raster: Fn(N) -> N,
 {
-    pub fn new(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max, Raster> {
+    pub fn new(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max> {
         DynamicLinearScale {
             min,
             max,
-            rasterizer: None,
             inverted: false,
         }
     }
 
-    pub fn inverted(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max, Raster> {
+    pub fn inverted(min: Min, max: Max) -> DynamicLinearScale<N, Min, Max> {
         DynamicLinearScale {
             min,
             max,
-            rasterizer: None,
-            inverted: true,
-        }
-    }
-
-    pub fn with_rasterizer(
-        min: Min,
-        max: Max,
-        rasterizer: Raster,
-    ) -> DynamicLinearScale<N, Min, Max, Raster> {
-        DynamicLinearScale {
-            min,
-            max,
-            rasterizer: Some(rasterizer),
-            inverted: false,
-        }
-    }
-    pub fn inverted_with_rasterizer(
-        min: Min,
-        max: Max,
-        rasterizer: Raster,
-    ) -> DynamicLinearScale<N, Min, Max, Raster> {
-        DynamicLinearScale {
-            min,
-            max,
-            rasterizer: Some(rasterizer),
             inverted: true,
         }
     }
 }
 
-impl<N, Min, Max, Raster> Scale<N> for DynamicLinearScale<N, Min, Max, Raster>
+impl<N, Min, Max> Scale<N> for DynamicLinearScale<N, Min, Max>
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
     Min: Fn() -> N,
     Max: Fn() -> N,
-    Raster: Fn(N) -> N,
 {
     fn to_relative(&self, absolute: N) -> f64 {
-        let absolute = if let Some(rasterizer) = self.rasterizer.as_ref() {
-            rasterizer(absolute)
-        } else {
-            absolute
-        }
-        .to_float();
+        let absolute = absolute.to_float();
 
         let min = self.min().to_float();
         let max = self.min().to_float();
@@ -235,12 +150,7 @@ where
         let full_range = max - min;
         let partial = relative * full_range;
         let abs = min + partial;
-        let abs: N = N::from_float(abs);
-        if let Some(rasterizer) = self.rasterizer.as_ref() {
-            rasterizer(abs)
-        } else {
-            abs
-        }
+        N::from_float(abs)
     }
 
     fn max(&self) -> N {
@@ -314,17 +224,6 @@ mod tests {
 
         assert_approx_eq!((&scale_a, &scale_b).convert(25.0), -0.5);
         assert_approx_eq!((&scale_b, &scale_a).convert(0.5), 75.0);
-    }
-
-    #[test]
-    fn test_rasterizer() {
-        let min: f32 = 0.0;
-        let max: f32 = 1_000.0;
-        let step = 10.0;
-        let scale: LinearScale<f32> =
-            LinearScale::with_rasterizer(min, max, move |u| (u / step).round() * step);
-        assert_approx_eq!(scale.to_absolute(0.085), 90.0);
-        assert_approx_eq!(scale.to_relative(85.0), 0.09);
     }
 
     #[test]

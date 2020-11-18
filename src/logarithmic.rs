@@ -2,6 +2,7 @@ use super::convert::*;
 use super::linear::*;
 use super::*;
 
+#[derive(Debug, Clone)]
 pub struct LogarithmicScale<N> {
     min: N,
     max: N,
@@ -26,38 +27,6 @@ where
             linear_delegate: LinearScale::inverted(
                 apply_to(min, f64::log10),
                 apply_to(max, f64::log10),
-            ),
-        }
-    }
-
-    pub fn with_rasterizer(
-        min: N,
-        max: N,
-        rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LogarithmicScale<N> {
-        LogarithmicScale {
-            min: min.clone(),
-            max: max.clone(),
-            linear_delegate: LinearScale::with_rasterizer(
-                apply_to(min, f64::log10),
-                apply_to(max, f64::log10),
-                rasterizer,
-            ),
-        }
-    }
-
-    pub fn inverted_with_rasterizer(
-        min: N,
-        max: N,
-        rasterizer: impl Fn(N) -> N + 'static,
-    ) -> LogarithmicScale<N> {
-        LogarithmicScale {
-            min: min.clone(),
-            max: max.clone(),
-            linear_delegate: LinearScale::inverted_with_rasterizer(
-                apply_to(min, f64::log10),
-                apply_to(max, f64::log10),
-                rasterizer,
             ),
         }
     }
