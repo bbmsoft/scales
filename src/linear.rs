@@ -1,7 +1,7 @@
 use super::convert::*;
 use super::*;
 /// A linear scale implementation with a fixed minimum and maximum that can optionally be inverted.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LinearScale<N> {
     min: N,
     max: N,
