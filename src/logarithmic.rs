@@ -2,7 +2,7 @@ use super::convert::*;
 use super::linear::*;
 use super::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LogarithmicScale<N> {
     min: N,
     max: N,
