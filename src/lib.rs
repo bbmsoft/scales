@@ -82,3 +82,47 @@ where
         SN::min(self)
     }
 }
+
+impl<N, SN> Scale<N> for Box<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::prelude::*;
+
+    #[test]
+    fn test_boxed_scale() {
+        // just checking if blanket implementations compile, no assertions here
+
+        let scale: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let boxed = Box::new(&scale);
+        boxed.to_absolute(0.5);
+
+        let other_scale: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let other_boxed = Box::new(other_scale);
+        other_boxed.to_relative(5.0);
+
+        let converter = (boxed, other_boxed);
+        converter.convert(32.0);
+    }
+}
