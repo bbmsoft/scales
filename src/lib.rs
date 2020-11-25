@@ -7,7 +7,10 @@ mod linear;
 mod logarithmic;
 
 use convert::*;
+use std::cell::RefCell;
 use std::ops::*;
+use std::rc::Rc;
+use std::sync::Arc;
 
 /// A scale is a mapping of an arbitrary, not necessarily linear, continuous and monotonically
 /// increasing range of numbers to a relative value between 0.0 and 1.0.
@@ -105,24 +108,111 @@ where
     }
 }
 
+impl<N, SN> Scale<N> for Rc<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
+
+impl<N, SN> Scale<N> for RefCell<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self.borrow().deref(), absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self.borrow().deref(), relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self.borrow().deref())
+    }
+
+    fn min(&self) -> N {
+        SN::min(self.borrow().deref())
+    }
+}
+
+impl<N, SN> Scale<N> for Arc<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
+
 #[cfg(test)]
 mod test {
 
     use crate::prelude::*;
+    use std::rc::Rc;
 
     #[test]
     fn test_boxed_scale() {
         // just checking if blanket implementations compile, no assertions here
 
-        let scale: LinearScale<f64> = LinearScale::new(0.0, 100.0);
-        let boxed = Box::new(&scale);
-        boxed.to_absolute(0.5);
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Box::new(&a);
+        a.to_absolute(0.5);
 
-        let other_scale: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
-        let other_boxed = Box::new(other_scale);
-        other_boxed.to_relative(5.0);
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = Box::new(b);
+        b.to_relative(5.0);
 
-        let converter = (boxed, other_boxed);
-        converter.convert(32.0);
+        let conv = (a, b);
+        conv.convert(32.0);
+
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Rc::new(a);
+        a.to_absolute(0.4);
+
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = RefCell::new(b);
+
+        let conv = (a, b);
+        conv.convert(32.0);
+
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Arc::new(a);
+        a.to_absolute(0.4);
+
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = RefCell::new(b);
+
+        let conv = (a, b);
+        conv.convert(32.0);
     }
 }
