@@ -65,7 +65,8 @@ where
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+    use crate::prelude::*;
+    use assert_approx_eq::*;
     use std::time::*;
 
     #[test]

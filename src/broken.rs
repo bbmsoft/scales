@@ -118,7 +118,8 @@ where
 #[cfg(test)]
 mod test {
 
-    use super::prelude::*;
+    use crate::prelude::*;
+    use assert_approx_eq::*;
 
     #[test]
     fn test_broken_scale() {
