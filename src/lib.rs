@@ -2,12 +2,15 @@ pub mod prelude;
 
 mod broken;
 mod convert;
+mod converter;
 mod linear;
 mod logarithmic;
 
 use convert::*;
-use std::cmp::Ordering;
+use std::cell::RefCell;
 use std::ops::*;
+use std::rc::Rc;
+use std::sync::Arc;
 
 /// A scale is a mapping of an arbitrary, not necessarily linear, continuous and monotonically
 /// increasing range of numbers to a relative value between 0.0 and 1.0.
@@ -61,66 +64,6 @@ where
     }
 }
 
-pub trait Converter<E, I>
-where
-    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-{
-    fn convert(&self, external_value: E) -> I;
-    fn convert_back(&self, internal_value: I) -> E;
-
-    fn add_external(&self, external_delta: E, internal_value: I) -> I {
-        let external_value = self.convert_back(internal_value);
-        let new_internal_value = self.convert(external_value + external_delta);
-        new_internal_value
-    }
-
-    fn add_internal(&self, internal_delta: I, external_value: E) -> E {
-        let internal_value = self.convert(external_value);
-        let new_external_value = self.convert_back(internal_value + internal_delta);
-        new_external_value
-    }
-}
-
-pub trait ClampingConverter<E, I>: Converter<E, I>
-where
-    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-{
-    fn external_max(&self) -> E;
-    fn external_min(&self) -> E;
-    fn internal_max(&self) -> I;
-    fn internal_min(&self) -> I;
-
-    fn add_external_clamped(&self, external_delta: E, internal_value: I) -> I {
-        let min = self.internal_min();
-        let max = self.internal_max();
-        let val = self.add_external(external_delta, internal_value);
-
-        match min.partial_cmp(&val) {
-            Some(Ordering::Greater) => min,
-            _ => match max.partial_cmp(&val) {
-                Some(Ordering::Less) => max,
-                _ => val,
-            },
-        }
-    }
-
-    fn add_internal_clamped(&self, internal_delta: I, external_value: E) -> E {
-        let min = self.external_min();
-        let max = self.external_max();
-        let val = self.add_internal(internal_delta, external_value);
-
-        match min.partial_cmp(&val) {
-            Some(Ordering::Greater) => min,
-            _ => match max.partial_cmp(&val) {
-                Some(Ordering::Less) => max,
-                _ => val,
-            },
-        }
-    }
-}
-
 impl<N, SN> Scale<N> for &SN
 where
     N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
@@ -143,111 +86,133 @@ where
     }
 }
 
-impl<E, I, SE, SI> Converter<E, I> for (SE, SI)
+impl<N, SN> Scale<N> for Box<SN>
 where
-    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    SE: Scale<E>,
-    SI: Scale<I>,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
 {
-    fn convert(&self, external_value: E) -> I {
-        let external = &self.0;
-        let internal = &self.1;
-        let rel = external.to_relative(external_value);
-        internal.to_absolute(rel)
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
     }
 
-    fn convert_back(&self, internal_value: I) -> E {
-        let external = &self.0;
-        let internal = &self.1;
-        let rel = internal.to_relative(internal_value);
-        external.to_absolute(rel)
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
     }
 }
 
-impl<E, I, SE, SI> ClampingConverter<E, I> for (SE, SI)
+impl<N, SN> Scale<N> for Rc<SN>
 where
-    E: Sub<Output = E> + Add<Output = E> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    I: Sub<Output = I> + Add<Output = I> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
-    SE: Scale<E>,
-    SI: Scale<I>,
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
 {
-    fn external_max(&self) -> E {
-        self.0.max()
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
     }
 
-    fn external_min(&self) -> E {
-        self.0.min()
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
     }
 
-    fn internal_max(&self) -> I {
-        self.1.max()
+    fn max(&self) -> N {
+        SN::max(self)
     }
 
-    fn internal_min(&self) -> I {
-        self.1.min()
+    fn min(&self) -> N {
+        SN::min(self)
     }
 }
 
-#[cfg(test)]
-#[macro_use]
-extern crate assert_approx_eq;
+impl<N, SN> Scale<N> for RefCell<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self.borrow().deref(), absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self.borrow().deref(), relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self.borrow().deref())
+    }
+
+    fn min(&self) -> N {
+        SN::min(self.borrow().deref())
+    }
+}
+
+impl<N, SN> Scale<N> for Arc<SN>
+where
+    N: Sub<Output = N> + Add<Output = N> + PartialOrd + FromFloat<f64> + ToFloat<f64> + Clone,
+    SN: Scale<N>,
+{
+    fn to_relative(&self, absolute: N) -> f64 {
+        SN::to_relative(self, absolute)
+    }
+
+    fn to_absolute(&self, relative: f64) -> N {
+        SN::to_absolute(self, relative)
+    }
+
+    fn max(&self) -> N {
+        SN::max(self)
+    }
+
+    fn min(&self) -> N {
+        SN::min(self)
+    }
+}
 
 #[cfg(test)]
 mod test {
 
-    use super::linear::*;
-    use super::logarithmic::*;
-    use super::*;
+    use crate::prelude::*;
+    use std::rc::Rc;
 
     #[test]
-    fn test_converter() {
-        let lin = LinearScale::new(0.0, 100.0);
-        let log = LogarithmicScale::new(20.0, 24_000.0);
+    fn test_boxed_scale() {
+        // just checking if blanket implementations compile, no assertions here
 
-        assert_approx_eq!((&lin, &log).convert(0.0), 20f64);
-        assert_approx_eq!((lin, log).convert(100.0), 24_000f64);
-    }
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Box::new(&a);
+        a.to_absolute(0.5);
 
-    #[test]
-    fn example_from_readme() {
-        let slider = Slider;
-        let parameter = Parameter;
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = Box::new(b);
+        b.to_relative(5.0);
 
-        let relative = (slider.value() - slider.min()) / (slider.max() - slider.min());
-        let log_range = parameter.max().log10() - parameter.min().log10();
-        let exp = parameter.min().log10() + relative * log_range;
-        let new_value = 10f64.powf(exp);
-        parameter.set(new_value);
+        let conv = (a, &b);
+        conv.convert(32.0);
 
-        let slider_scale = LinearScale::new(slider.min(), slider.max());
-        let parameter_scale = LogarithmicScale::new(parameter.min(), parameter.max());
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Rc::new(a);
+        a.to_absolute(0.4);
 
-        let new_value = (&slider_scale, &parameter_scale).convert(slider.value());
-        parameter.set(new_value);
-    }
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = RefCell::new(b);
 
-    struct Slider;
-    impl Slider {
-        fn value(&self) -> f64 {
-            21.0
-        }
-        fn min(&self) -> f64 {
-            0.0
-        }
-        fn max(&self) -> f64 {
-            100.0
-        }
-    }
+        let conv = (a, &b);
+        conv.convert(32.0);
 
-    struct Parameter;
-    impl Parameter {
-        fn set(&self, _: f64) {}
-        fn min(&self) -> f64 {
-            10.0
-        }
-        fn max(&self) -> f64 {
-            500.0
-        }
+        let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
+        let a = Arc::new(a);
+        a.to_absolute(0.4);
+
+        let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
+        let b = RefCell::new(b);
+
+        let conv = (a, &b);
+        conv.convert(32.0);
     }
 }

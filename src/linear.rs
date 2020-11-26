@@ -167,7 +167,8 @@ where
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+    use crate::prelude::*;
+    use assert_approx_eq::*;
 
     #[test]
     fn test_linear_to_rel_f64() {
