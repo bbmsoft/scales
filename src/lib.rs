@@ -192,7 +192,7 @@ mod test {
         let b = Box::new(b);
         b.to_relative(5.0);
 
-        let conv = (a, b);
+        let conv = (a, &b);
         conv.convert(32.0);
 
         let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
@@ -202,7 +202,7 @@ mod test {
         let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
         let b = RefCell::new(b);
 
-        let conv = (a, b);
+        let conv = (a, &b);
         conv.convert(32.0);
 
         let a: LinearScale<f64> = LinearScale::new(0.0, 100.0);
@@ -212,7 +212,7 @@ mod test {
         let b: LogarithmicScale<f64> = LogarithmicScale::new(1.0, 10.0);
         let b = RefCell::new(b);
 
-        let conv = (a, b);
+        let conv = (a, &b);
         conv.convert(32.0);
     }
 }
