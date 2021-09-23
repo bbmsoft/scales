@@ -1,3 +1,3 @@
 #!/bin/bash
-cargo test
+cargo make test
 echo "Your workspace is ready!"
