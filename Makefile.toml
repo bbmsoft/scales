@@ -2,6 +2,11 @@
 command = "cargo"
 args = ["fmt"]
 
+[tasks.test]
+command = "cargo"
+args = ["test"]
+dependencies = ["format"]
+
 [tasks.build-dev]
 command = "cargo"
 args = ["build"]
