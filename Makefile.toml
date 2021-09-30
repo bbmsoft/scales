@@ -7,12 +7,12 @@ command = "cargo"
 args = ["test"]
 dependencies = ["format"]
 
-[tasks.build-dev]
+[tasks.build]
 command = "cargo"
 args = ["build"]
 dependencies = ["format"]
 
-[tasks.build]
+[tasks.build-prod]
 command = "cargo"
 args = ["build", "--release"]
 dependencies = ["format"]
