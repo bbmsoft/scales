@@ -1,7 +1,9 @@
+image: babymotte/gitpod-workspace-rust:latest
+
 # List the start up tasks. Learn more https://www.gitpod.io/docs/config-start-tasks/
 tasks:
   - init: curl https://raw.githubusercontent.com/bbmsoft/gitpod-workspace-rust/main/init.sh | bash
-    command: curl https://raw.githubusercontent.com/bbmsoft/gitpod-workspace-rust/main/command.sh | bash && source ~/.bashrc
+    command: curl https://raw.githubusercontent.com/bbmsoft/gitpod-workspace-rust/main/command.sh | bash
 
 # List the ports to expose. Learn more https://www.gitpod.io/docs/config-ports/
 ports:
